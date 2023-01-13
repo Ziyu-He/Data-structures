@@ -1,0 +1,199 @@
+from typing import List
+from collections import namedtuple
+import time
+
+
+class Point(namedtuple("Point", "x y")):
+    def __repr__(self) -> str:
+        return f'Point{tuple(self)!r}'
+
+
+class Rectangle(namedtuple("Rectangle", "lower upper")):
+    def __repr__(self) -> str:
+        return f'Rectangle{tuple(self)!r}'
+
+    def is_contains(self, p: Point) -> bool:
+        return self.lower.x <= p.x <= self.upper.x and self.lower.y <= p.y <= self.upper.y
+
+
+class Node(namedtuple("Node", "location left right")):
+    """
+    location: Point
+    left: Node
+    right: Node
+    """
+
+    def __repr__(self):
+        return f'{tuple(self)!r}'
+   
+    
+class KDTree:
+    """k-d tree"""
+
+    def __init__(self):
+        self._root = None
+        self._n = 0
+
+    def insert(self, p: List[Point]):
+        """insert a list of points"""    
+        def insert1(h,list):
+            if len(list)==0:
+                return None
+            elif len(list)==1:
+                return Node(list[0],None,None)
+            else:
+                if h%2==0:
+                    list.sort(key=lambda t:t.x)
+                if h%2==1:
+                    list.sort(key=lambda t:t.y)
+                mid=len(list)//2
+                leftside=list[:mid]
+                rightside=list[mid+1:]
+                return Node(list[mid],insert1(h+1,leftside),insert1(h+1,rightside))
+        self._root = insert1(0,p)
+        
+    def range(self, rectangle: Rectangle) -> List[Point]:#method1
+        """range query"""
+        result=[]
+        def range1(rec,node,h=0):#h代表kd树的深度
+            if node is None:#special case 
+                return None
+            if h%2 == 0:
+                if rec.lower.x<=node.location.x<=rec.upper.x and rec.lower.y<=node.location.y<=rec.upper.y:
+                    result.append(node.location)
+                elif rec.lower.x > node.location.x:
+                    range1(rec,node.right,h+1)#循环：在下一个深度，从现在node的右边开始找
+                elif rec.upper.x < node.location.x:
+                    range1(rec,node.left,h+1)
+                if rec.lower.x <= node.location.x <= rec.upper.x:
+                    range1(rec,node.right,h+1)
+                    range1(rec,node.left,h+1)        
+            if h%2 == 1:#原理同深度为偶数类似
+                if rec.lower.x<=node.location.x<=rec.upper.x and rec.lower.y<=node.location.y<=rec.upper.y:
+                    result.append(node.location)
+                elif rec.lower.y > node.location.y:
+                    range1(rec,node.right,h+1)
+                elif rec.upper.y < node.location.y:
+                    range1(rec,node.left,h+1)
+                if rec.lower.y <= node.location.y <= rec.upper.y:
+                    range1(rec,node.right,h+1)
+                    range1(rec,node.left,h+1)
+        range1(rectangle,self._root,0)
+        return result
+
+
+'''用遍历方法的range(The time complexity of the method is so high but I think at least the idea is good.)因为这里定义了两个同名range，跑代码的时候麻烦注释掉一个'''
+def range(self, rectangle: Rectangle) -> List[Point]:
+            """range query"""
+        def find(node):
+            l=[]
+            if node.right==None and node.left==None:
+                l.extend(node.location)
+                return l
+            elif node.right==None and node.left!=None:
+                l.extend(node.location)
+                l.extend(find(node.left))
+            elif node.right!=None and node.left==None:
+                l.extend(node.location)
+                l.extend(find(node.right))
+            else:
+                l.extend(node.location)
+                l.extend(find(node.right))
+                l.extend(find(node.left))
+            return l
+        store=find(self._root)
+        xl=[]
+        yl=[]
+        for i in range(len(store)//2):
+            yl.append(store[2*i+1])
+            xl.append(store[2*i])
+        pl=[]
+        for i in range(len(xl)):
+            pl.append(Point(xl[i],yl[i]))
+        rec=rectangle
+        x1=rec.lower.x
+        x2=rec.upper.x
+        y1=rec.lower.y
+        y2=rec.upper.y
+        result=[]
+        for i in pl:
+            if x1<=i.x<=x2 and y1<=i.y<=y2:
+                result.append(i)
+        result
+        return result
+
+
+#nearest neighbor query的实现（遍历的方法）
+def nnquery(self,point):
+    def find(node):#通过循环的方法找出由各点坐标组成的list（同第二个range方法中的部分）
+        l=[]
+        if node.right==None and node.left==None:
+            l.extend(node.location)
+            return l
+        elif node.right==None and node.left!=None:
+            l.extend(node.location)
+            l.extend(find(node.left))
+        elif node.right!=None and node.left==None:
+            l.extend(node.location)
+            l.extend(find(node.right))
+        else:
+            l.extend(node.location)
+            l.extend(find(node.right))
+            l.extend(find(node.left))
+        return l
+    
+    store=find(self._root)
+    xl=[]
+    yl=[]
+    for i in range(len(store)//2):
+        yl.append(store[2*i+1])
+        xl.append(store[2*i])
+    pl=[]
+    for i in range(len(xl)):
+        pl.append(Point(xl[i],yl[i]))#pl为由kd-tree中所有元素的坐标（point）组成的list
+    elms=pl
+    distance = 10000000000#设置一个初始的距离（较大），供之后比较
+    for i in elms:
+        dis=((point.x-i.x)^2+(point.y-i.y)^2)^0.5
+        if dis<=distance:
+            distance = dis#找到最小距离
+    for i in elms:#找到最小距离后对找对应的点
+        if ((point.x-i.x)^2+(point.y-i.y)^2)^0.5 == distance:
+            result = i
+    return result
+        
+
+def range_test():
+    points = [Point(7, 2), Point(5, 4), Point(9, 6), Point(4, 7), Point(8, 1), Point(2, 3)]
+    kd = KDTree()
+    kd.insert(points)
+    result = kd.range(Rectangle(Point(0, 0), Point(6, 6)))
+    assert sorted(result) == sorted([Point(2, 3), Point(5, 4)])
+
+
+def performance_test():
+    points = [Point(x, y) for x in range(1000) for y in range(1000)]
+
+    lower = Point(500, 500)
+    upper = Point(504, 504)
+    rectangle = Rectangle(lower, upper)
+    #  naive method
+    start = int(round(time.time() * 1000))
+    result1 = [p for p in points if rectangle.is_contains(p)]
+    end = int(round(time.time() * 1000))
+    print(f'Naive method: {end - start}ms')
+
+    kd = KDTree()
+    kd.insert(points)
+    # k-d tree
+    start = int(round(time.time() * 1000))
+    result2 = kd.range(rectangle)
+    end = int(round(time.time() * 1000))
+    print(f'K-D tree: {end - start}ms')
+
+    assert sorted(result1) == sorted(result2)
+
+
+if __name__ == '__main__':
+    range_test()
+    performance_test()
